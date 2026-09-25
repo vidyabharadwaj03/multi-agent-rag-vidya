@@ -4,6 +4,7 @@ import sys
 from tabulate import tabulate
 
 from multiagent.factory import build_manager_agent
+from multiagent.llm_client import DailyQuotaExceededError
 from multiagent.logging_config import configure_logging
 
 
@@ -51,7 +52,17 @@ def format_response(response):
 
 
 def run_query(manager, query):
-    response = manager.handle(query)
+    try:
+        response = manager.handle(query)
+    except DailyQuotaExceededError:
+        print(
+            "\nThe LLM provider's daily request quota has been used up. "
+            "Please try again after the quota resets, or use a different API key."
+        )
+        return
+    except Exception as error:
+        print(f"\nSomething went wrong while handling that query: {error}")
+        return
     print(format_response(response))
 
 

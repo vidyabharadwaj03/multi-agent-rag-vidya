@@ -1,4 +1,6 @@
+from multiagent.cli import run_query
 from multiagent.cli import format_response
+from multiagent.llm_client import DailyQuotaExceededError
 from multiagent.schemas import AgentAnswer, Citation, ManagerResponse, QualitativeResult, QuantitativeResult
 
 
@@ -75,3 +77,26 @@ def test_format_response_combines_complex_answers():
     assert "Combined answer:" in output
     assert "Policy answer." in output
     assert "Data answer." in output
+
+
+class FailingManager:
+    def __init__(self, exception):
+        self.exception = exception
+
+    def handle(self, query):
+        raise self.exception
+
+
+def test_run_query_handles_daily_quota_error_without_crashing(capsys):
+    manager = FailingManager(DailyQuotaExceededError("quota gone"))
+    run_query(manager, "any question")
+    output = capsys.readouterr().out
+    assert "daily request quota" in output.lower()
+
+
+def test_run_query_handles_unexpected_error_without_crashing(capsys):
+    manager = FailingManager(RuntimeError("boom"))
+    run_query(manager, "any question")
+    output = capsys.readouterr().out
+    assert "went wrong" in output.lower()
+    assert "boom" in output
