@@ -1,5 +1,8 @@
+import os
 import re
 from pathlib import Path
+
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
 import chromadb
 from chromadb.utils import embedding_functions
