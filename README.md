@@ -110,33 +110,33 @@ deterministic, and don't consume API quota), SQL safety validation, vector store
 retrieval, the LLM client's retry behavior, CLI output formatting, the FastAPI
 routes, and full end-to-end integration for all four query types.
 
-## GenAI fundamentals applied
+## GenAI fundamentals I applied
 
-- **Hallucination mitigation**: the qualitative agent is explicitly prompted to
-  answer only from retrieved context and to say when the context doesn't
-  contain the answer, and a minimum similarity threshold (default 0.3) rejects
-  weak matches before they ever reach the LLM, returning a clear "not found"
-  message instead of letting the model guess.
-- **SQL injection / unsafe generation**: LLM-generated SQL is never trusted
-  directly. `sql_tools.validate_select_only` rejects anything that isn't a
-  single `SELECT` statement before it touches the database, since an LLM asked
-  to "write SQL" can in principle be prompted or drift into writing destructive
-  statements.
-- **Token budget vs. reasoning overhead**: this project surfaced a real
-  failure mode worth documenting: the configured Gemini model spends part of
-  its `max_tokens` budget on hidden reasoning tokens not visible in the
-  response content, so a `max_tokens` value sized only for the visible answer
-  silently truncates the output (`finish_reason: length`) well before the
-  model finishes. Token budgets are set generously to leave room for both.
-- **Agent-tool pattern**: each agent is a thin orchestrator around external
-  tools (a vector index, a SQL database) rather than a bare LLM call. The LLM
-  decides *what* to retrieve or *what query* to run, but never directly
-  produces the final answer without a tool call grounding it, and the same
-  routing logic is reused by both the CLI and the API.
-- **Ambiguity handling**: rather than forcing every query into qualitative or
-  quantitative, the manager can classify a query as ambiguous and ask a
-  clarifying question, since guessing on an underspecified query is a common
-  source of irrelevant tool calls.
+**Stopping hallucinations.** I told the qualitative agent to only answer from
+the documents it retrieved, and to say so if the answer isn't in there. I also
+added a minimum similarity score (0.3) so if nothing relevant comes back, it
+just says "not found" instead of letting the model make something up.
+
+**Not trusting generated SQL.** The LLM writes the SQL, but I don't run it
+blindly. Before it touches the database, I check that it's a single `SELECT`
+statement and nothing else — since an LLM asked to write SQL could in theory
+be pushed into writing something destructive.
+
+**A real bug I ran into: token budgets.** While testing, my answers kept
+getting cut off mid-sentence. It turned out the Gemini model spends part of
+its token budget on internal reasoning I never see, so a `max_tokens` value
+sized just for the visible answer was running out before the model finished
+(`finish_reason: length`). I fixed it by giving it a much bigger budget.
+
+**How the agents use tools.** Neither agent just asks the LLM a question and
+returns whatever comes back. The LLM decides what to search for or what SQL
+to write, then a real tool (the vector store or the database) actually does
+the lookup, and only then does the LLM turn that result into an answer. The
+CLI and the API both call the same agents, so the logic isn't duplicated.
+
+**Handling vague questions.** If a question is too unclear to route, the
+manager doesn't just guess — it asks a clarifying question instead, since
+guessing usually means calling the wrong agent.
 
 ## Project layout
 
