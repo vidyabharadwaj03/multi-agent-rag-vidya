@@ -139,10 +139,11 @@ def populate_employee_satisfaction(conn, rng):
     )
 
 
-def build():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def build(db_path=None):
+    db_path = Path(db_path) if db_path else DB_PATH
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(42)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
     try:
         create_schema(conn)
         populate_revenue(conn, rng)
@@ -152,7 +153,8 @@ def build():
         conn.commit()
     finally:
         conn.close()
-    print(f"Built {DB_PATH}")
+    print(f"Built {db_path}")
+    return db_path
 
 
 if __name__ == "__main__":
