@@ -166,3 +166,21 @@ def test_complete_passes_system_message(monkeypatch):
 
     assert captured["messages"][0] == {"role": "system", "content": "be helpful"}
     assert captured["messages"][1] == {"role": "user", "content": "question"}
+
+
+def test_complete_logs_structured_error_on_daily_quota_failure(monkeypatch, caplog):
+    client = LLMClient(api_key="key", model="test-model", base_url="https://example.com")
+
+    def failing_create(**kwargs):
+        raise make_daily_quota_error()
+
+    monkeypatch.setattr(client._client.chat.completions, "create", failing_create)
+
+    with caplog.at_level("ERROR", logger="multiagent.llm_client"):
+        with pytest.raises(DailyQuotaExceededError):
+            client.complete("hi")
+
+    error_records = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert len(error_records) == 1
+    assert error_records[0].fields["error_type"] == "DailyQuotaExceededError"
+    assert error_records[0].fields["model"] == "test-model"

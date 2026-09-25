@@ -1,7 +1,10 @@
+import logging
 import re
 import time
 
 from openai import APIStatusError, OpenAI
+
+from multiagent.logging_config import get_logger, log_event
 
 
 class DailyQuotaExceededError(Exception):
@@ -14,8 +17,23 @@ class LLMClient:
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
         self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self.logger = get_logger("llm_client")
 
     def complete(self, prompt, system=None, max_tokens=1500, temperature=0.0):
+        try:
+            return self._complete_with_retries(prompt, system, max_tokens, temperature)
+        except Exception as error:
+            log_event(
+                self.logger,
+                "llm_call_failed",
+                level=logging.ERROR,
+                model=self.model,
+                error_type=type(error).__name__,
+                error=str(error)[:300],
+            )
+            raise
+
+    def _complete_with_retries(self, prompt, system, max_tokens, temperature):
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
